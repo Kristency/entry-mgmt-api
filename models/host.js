@@ -4,7 +4,7 @@ const hostSchema = new mongoose.Schema({
 	name: String,
 	email: String,
 	phone: String,
-	visitors: [
+	currentVisitors: [
 		{
 			type: mongoose.Schema.Types.ObjectId,
 			ref: 'Visitor'
