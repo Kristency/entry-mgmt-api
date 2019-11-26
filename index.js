@@ -1,7 +1,9 @@
 const express = require('express')
 const app = express()
+require('dotenv').config()
 const mongoose = require('mongoose')
 const nodemailer = require('nodemailer')
+const moment = require('moment')
 const cors = require('cors')
 
 //app config
@@ -9,7 +11,9 @@ app.use(cors())
 app.use(express.json())
 
 mongoose.connect(process.env.DATABASEURL || 'mongodb://localhost:27017/entry-mgmt', {
-	useNewUrlParser: true
+	useNewUrlParser: true,
+	useUnifiedTopology: true, //  DeprecationWarning: current Server Discovery and Monitoring engine is deprecated, and will be removed in a future version. To use the new Server Discover and Monitoring engine, pass option { useUnifiedTopology: true } to the MongoClient constructor.
+	useFindAndModify: false //   DeprecationWarning: Mongoose: `findOneAndUpdate()` and `findOneAndDelete()` without the `useFindAndModify` option set to false are deprecated. See: https://mongoosejs.com/docs/deprecations.html#-findandmodify-
 })
 
 //requiring models
@@ -42,14 +46,14 @@ app.get('/host/:id', (req, res) => {
 })
 
 app.post('/hosts', (req, res) => {
-	let { name, email, phone } = req.body
-	Host.findOne({ phone }, (err, foundHost) => {
+	let { name, email, phone, currentAddress } = req.body
+	Host.findOne({ phone, email }, (err, foundHost) => {
 		if (err) {
 			console.log(err)
 		} else if (foundHost) {
 			res.json(foundHost)
 		} else {
-			Host.create({ name, email, phone }, (err, createdHost) => {
+			Host.create({ name, email, phone, currentAddress }, (err, createdHost) => {
 				if (err) {
 					console.log(err)
 				} else {
@@ -61,8 +65,22 @@ app.post('/hosts', (req, res) => {
 })
 
 app.post('/visitors', (req, res) => {
-	let { name, email, phone, hostId, address, checkInTime } = req.body
-	Visitor.findOne({ phone }, (err, foundVisitor) => {
+	let { name, email, phone, hostId, checkInTime } = req.body
+
+	const transporter = nodemailer.createTransport({
+		service: process.env.NODEMAILER_MAIL_SERVICE,
+		auth: {
+			user: process.env.NODEMAILER_FROM_ADDRESS,
+			pass: process.env.NODEMAILER_PASSWORD
+		},
+		rejectUnauthorized: false
+	})
+
+	let textToSend = `<strong>Name : </strong>${name}<br/><br/><strong>Email address : </strong>${email}<br/><br/><strong>Phone : </strong>${phone}<br/><br/><strong>Check-in time : </strong>${moment(
+		checkInTime
+	).format('h:mm a, dddd, MMMM Do YYYY')}`
+
+	Visitor.findOne({ phone, email }, (err, foundVisitor) => {
 		if (err) {
 			console.log(err)
 		} else {
@@ -72,15 +90,32 @@ app.post('/visitors', (req, res) => {
 						console.log(err)
 					} else {
 						let hostName = foundHost.name
+						let currentAddress = foundHost.currentAddress
+						let emailToSend = foundHost.email
+
 						foundHost.currentVisitors.push(foundVisitor)
 						foundHost.save()
+
 						Session.create(
-							{ name, email, phone, hostName, address, checkInTime },
+							{ name, email, phone, hostName, address: currentAddress, checkInTime },
 							(err, createdSession) => {
 								if (err) {
 									console.log(err)
 								} else {
 									res.json({ ...createdSession, hostId })
+
+									let mailOptions = {
+										from: process.env.NODEMAILER_FROM_ADDRESS,
+										to: emailToSend,
+										subject: `Visitor checked in`,
+										html: textToSend
+									}
+
+									transporter.sendMail(mailOptions, (err, info) => {
+										if (err) {
+											console.log(err)
+										}
+									})
 								}
 							}
 						)
@@ -96,15 +131,32 @@ app.post('/visitors', (req, res) => {
 								console.log(err)
 							} else {
 								let hostName = foundHost.name
+								let currentAddress = foundHost.currentAddress
+								let emailToSend = foundHost.email
+
 								foundHost.currentVisitors.push(createdVisitor)
 								foundHost.save()
+
 								Session.create(
-									{ name, email, phone, hostName, address, checkInTime },
+									{ name, email, phone, hostName, address: currentAddress, checkInTime },
 									(err, createdSession) => {
 										if (err) {
 											console.log(err)
 										} else {
 											res.json({ ...createdSession, hostId })
+
+											let mailOptions = {
+												from: process.env.NODEMAILER_FROM_ADDRESS,
+												to: emailToSend,
+												subject: `Visitor checked in`,
+												html: textToSend
+											}
+
+											transporter.sendMail(mailOptions, (err, info) => {
+												if (err) {
+													console.log(err)
+												}
+											})
 										}
 									}
 								)
@@ -119,31 +171,65 @@ app.post('/visitors', (req, res) => {
 
 app.patch('/checkoutVisitor', (req, res) => {
 	let { sessionId, selectedHostId, checkOutTime } = req.body
+	// console.log(checkOutTime)
 
-	Session.findByIdAndUpdate(sessionId, { $set: { checkOutTime } }, (err, updatedSession) => {
+	const transporter = nodemailer.createTransport({
+		service: process.env.NODEMAILER_MAIL_SERVICE,
+		auth: {
+			user: process.env.NODEMAILER_FROM_ADDRESS,
+			pass: process.env.NODEMAILER_PASSWORD
+		},
+		rejectUnauthorized: false
+	})
+
+	Session.findByIdAndUpdate(sessionId, { checkOutTime }, (err, updatedSession) => {
 		if (err) {
 			console.log(err)
 		} else {
-			Host.findById(selectedHostId, (err, foundHost) => {
-				if (err) {
-					console.log(err)
-				} else {
-					currentVisitors = foundHost.currentVisitors
-					let { name, phone, checkInTime } = updatedSession
-					for (let i = 0; i < currentVisitors.length; i++) {
-						if (
-							name === currentVisitors[i].name &&
-							phone === currentVisitors[i].phone &&
-							checkInTime === currentVisitors[i].checkInTime
-						) {
-							foundHost.currentVisitors.splice(i, 1)
-							foundHost.save()
-							break
+			res.json('Successfully checked out. Visit Details have been sent to your email.')
+
+			let { name, phone, checkInTime, hostName, address } = updatedSession
+
+			let emailToSend
+			let textToSend = `<strong>Name : </strong>${name}<br/><br/><strong>Phone : </strong>${phone}<br/><br/><strong>Check-in time : </strong>${moment(
+				checkInTime
+			).format('h:mm a, dddd, MMMM Do YYYY')}<br/><br/><strong>Check-out time : </strong>${moment(
+				checkOutTime
+			).format(
+				'h:mm a, dddd, MMMM Do YYYY'
+			)}<br/><br/><strong>Host name : </strong>${hostName}<br/><br/><strong>Address visited : </strong>${address}`
+
+			Host.findById(selectedHostId)
+				.populate('currentVisitors')
+				.exec((err, foundHost) => {
+					if (err) {
+						console.log(err)
+					} else {
+						let currentVisitors = foundHost.currentVisitors
+
+						for (let i = 0; i < currentVisitors.length; i++) {
+							if (name === currentVisitors[i].name && phone === currentVisitors[i].phone) {
+								emailToSend = currentVisitors[i].email
+								foundHost.currentVisitors.splice(i, 1)
+								foundHost.save()
+								break
+							}
 						}
+
+						let mailOptions = {
+							from: process.env.NODEMAILER_FROM_ADDRESS,
+							to: emailToSend,
+							subject: `Session Details of the meeting with ${foundHost.name}`,
+							html: textToSend
+						}
+
+						transporter.sendMail(mailOptions, (err, info) => {
+							if (err) {
+								console.log(err)
+							}
+						})
 					}
-					res.json('Successfully checked out')
-				}
-			})
+				})
 		}
 	})
 })

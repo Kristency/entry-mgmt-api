@@ -9,7 +9,8 @@ const hostSchema = new mongoose.Schema({
 			type: mongoose.Schema.Types.ObjectId,
 			ref: 'Visitor'
 		}
-	]
+	],
+	currentAddress: String
 })
 
 module.exports = mongoose.model('Host', hostSchema)
