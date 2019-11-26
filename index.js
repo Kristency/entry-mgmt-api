@@ -11,7 +11,7 @@ const cors = require('cors')
 app.use(cors())
 app.use(express.json())
 
-mongoose.connect(process.env.DATABASEURL || 'mongodb://localhost:27017/entry-mgmt', {
+mongoose.connect(process.env.DATABASEURL, {
 	useNewUrlParser: true,
 	useFindAndModify: false //   DeprecationWarning: Mongoose: `findOneAndUpdate()` and `findOneAndDelete()` without the `useFindAndModify` option set to false are deprecated. See: https://mongoosejs.com/docs/deprecations.html#-findandmodify-
 })
