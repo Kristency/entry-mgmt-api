@@ -3,6 +3,7 @@ const app = express()
 require('dotenv').config()
 const mongoose = require('mongoose')
 const nodemailer = require('nodemailer')
+const Nexmo = require('nexmo')
 const moment = require('moment')
 const cors = require('cors')
 
@@ -11,9 +12,8 @@ app.use(cors())
 app.use(express.json())
 
 mongoose.connect(process.env.DATABASEURL || 'mongodb://localhost:27017/entry-mgmt', {
-	useNewUrlParser: true
-	// useUnifiedTopology: true, //  DeprecationWarning: current Server Discovery and Monitoring engine is deprecated, and will be removed in a future version. To use the new Server Discover and Monitoring engine, pass option { useUnifiedTopology: true } to the MongoClient constructor.
-	// useFindAndModify: false //   DeprecationWarning: Mongoose: `findOneAndUpdate()` and `findOneAndDelete()` without the `useFindAndModify` option set to false are deprecated. See: https://mongoosejs.com/docs/deprecations.html#-findandmodify-
+	useNewUrlParser: true,
+	useFindAndModify: false //   DeprecationWarning: Mongoose: `findOneAndUpdate()` and `findOneAndDelete()` without the `useFindAndModify` option set to false are deprecated. See: https://mongoosejs.com/docs/deprecations.html#-findandmodify-
 })
 
 // mongoose.connect(
@@ -44,7 +44,7 @@ app.get('/hosts', (req, res) => {
 
 app.get('/host/:id', (req, res) => {
 	Host.findById(req.params.id)
-		.populate('currentVisitors')
+		.populate('pendingVisitors')
 		.exec((err, foundHost) => {
 			if (err) {
 				console.log(err)
@@ -85,7 +85,16 @@ app.post('/visitors', (req, res) => {
 		rejectUnauthorized: false
 	})
 
+	const nexmo = new Nexmo({
+		apiKey: process.env.NEXMO_API_KEY,
+		apiSecret: process.env.NEXMO_API_SECRET
+	})
+
 	let textToSend = `<strong>Name : </strong>${name}<br/><br/><strong>Email address : </strong>${email}<br/><br/><strong>Phone : </strong>${phone}<br/><br/><strong>Check-in time : </strong>${moment(
+		checkInTime
+	).format('h:mm a, dddd, MMMM Do YYYY')}`
+
+	let SMStextToSend = `Name : ${name}\n\nEmail address : ${email}\n\nPhone : ${phone}\n\nCheck-in time : ${moment(
 		checkInTime
 	).format('h:mm a, dddd, MMMM Do YYYY')}`
 
@@ -101,8 +110,9 @@ app.post('/visitors', (req, res) => {
 						let hostName = foundHost.name
 						let currentAddress = foundHost.currentAddress
 						let emailToSend = foundHost.email
+						let numberToSend = `91${foundHost.phone}`
 
-						foundHost.currentVisitors.push(foundVisitor)
+						foundHost.pendingVisitors.push(foundVisitor)
 						foundHost.save()
 
 						Session.create(
@@ -125,6 +135,8 @@ app.post('/visitors', (req, res) => {
 											console.log(err)
 										}
 									})
+
+									nexmo.message.sendSms(process.env.NEXMO_FROM_NUMBER, numberToSend, SMStextToSend)
 								}
 							}
 						)
@@ -142,8 +154,9 @@ app.post('/visitors', (req, res) => {
 								let hostName = foundHost.name
 								let currentAddress = foundHost.currentAddress
 								let emailToSend = foundHost.email
+								let numberToSend = `91${foundHost.phone}`
 
-								foundHost.currentVisitors.push(createdVisitor)
+								foundHost.pendingVisitors.push(createdVisitor)
 								foundHost.save()
 
 								Session.create(
@@ -166,6 +179,12 @@ app.post('/visitors', (req, res) => {
 													console.log(err)
 												}
 											})
+
+											nexmo.message.sendSms(
+												process.env.NEXMO_FROM_NUMBER,
+												numberToSend,
+												SMStextToSend
+											)
 										}
 									}
 								)
@@ -209,17 +228,17 @@ app.patch('/checkoutVisitor', (req, res) => {
 			)}<br/><br/><strong>Host name : </strong>${hostName}<br/><br/><strong>Address visited : </strong>${address}`
 
 			Host.findById(selectedHostId)
-				.populate('currentVisitors')
+				.populate('pendingVisitors')
 				.exec((err, foundHost) => {
 					if (err) {
 						console.log(err)
 					} else {
-						let currentVisitors = foundHost.currentVisitors
+						let pendingVisitors = foundHost.pendingVisitors
 
-						for (let i = 0; i < currentVisitors.length; i++) {
-							if (name === currentVisitors[i].name && phone === currentVisitors[i].phone) {
-								emailToSend = currentVisitors[i].email
-								foundHost.currentVisitors.splice(i, 1)
+						for (let i = 0; i < pendingVisitors.length; i++) {
+							if (name === pendingVisitors[i].name && phone === pendingVisitors[i].phone) {
+								emailToSend = pendingVisitors[i].email
+								foundHost.pendingVisitors.splice(i, 1)
 								foundHost.save()
 								break
 							}
@@ -248,5 +267,5 @@ app.get('*', (req, res) => {
 })
 
 app.listen(process.env.PORT || 8080, process.env.IP, () => {
-	console.log('Server is running on port 8080')
+	console.log('Server is running!')
 })
