@@ -11,10 +11,19 @@ app.use(cors())
 app.use(express.json())
 
 mongoose.connect(process.env.DATABASEURL || 'mongodb://localhost:27017/entry-mgmt', {
-	useNewUrlParser: true,
-	useUnifiedTopology: true, //  DeprecationWarning: current Server Discovery and Monitoring engine is deprecated, and will be removed in a future version. To use the new Server Discover and Monitoring engine, pass option { useUnifiedTopology: true } to the MongoClient constructor.
-	useFindAndModify: false //   DeprecationWarning: Mongoose: `findOneAndUpdate()` and `findOneAndDelete()` without the `useFindAndModify` option set to false are deprecated. See: https://mongoosejs.com/docs/deprecations.html#-findandmodify-
+	useNewUrlParser: true
+	// useUnifiedTopology: true, //  DeprecationWarning: current Server Discovery and Monitoring engine is deprecated, and will be removed in a future version. To use the new Server Discover and Monitoring engine, pass option { useUnifiedTopology: true } to the MongoClient constructor.
+	// useFindAndModify: false //   DeprecationWarning: Mongoose: `findOneAndUpdate()` and `findOneAndDelete()` without the `useFindAndModify` option set to false are deprecated. See: https://mongoosejs.com/docs/deprecations.html#-findandmodify-
 })
+
+// mongoose.connect(
+// 	'mongodb+srv://innovacer:innovacer@cluster0-lbpix.mongodb.net/test?retryWrites=true&w=majority',
+// 	{
+// 		useNewUrlParser: true
+// 		// useUnifiedTopology: true, //  DeprecationWarning: current Server Discovery and Monitoring engine is deprecated, and will be removed in a future version. To use the new Server Discover and Monitoring engine, pass option { useUnifiedTopology: true } to the MongoClient constructor.
+// 		// useFindAndModify: false //   DeprecationWarning: Mongoose: `findOneAndUpdate()` and `findOneAndDelete()` without the `useFindAndModify` option set to false are deprecated. See: https://mongoosejs.com/docs/deprecations.html#-findandmodify-
+// 	}
+// )
 
 //requiring models
 const Host = require('./models/host')
