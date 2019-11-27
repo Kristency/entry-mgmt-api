@@ -94,7 +94,7 @@ app.post('/visitors', (req, res) => {
 		checkInTime
 	).format('h:mm a, dddd, MMMM Do YYYY')}`
 
-	let SMStextToSend = `Name : ${name}\n\nEmail address : ${email}\n\nPhone : ${phone}\n\nCheck-in time : ${moment(
+	let SMStextToSend = `New visitor checked in.\n\nName : ${name}\n\nEmail address : ${email}\n\nPhone : ${phone}\n\nCheck-in time : ${moment(
 		checkInTime
 	).format('h:mm a, dddd, MMMM Do YYYY')}`
 
@@ -126,7 +126,7 @@ app.post('/visitors', (req, res) => {
 									let mailOptions = {
 										from: process.env.NODEMAILER_FROM_ADDRESS,
 										to: emailToSend,
-										subject: `Visitor checked in`,
+										subject: `New Visitor checked in`,
 										html: textToSend
 									}
 
@@ -170,7 +170,7 @@ app.post('/visitors', (req, res) => {
 											let mailOptions = {
 												from: process.env.NODEMAILER_FROM_ADDRESS,
 												to: emailToSend,
-												subject: `Visitor checked in`,
+												subject: `New Visitor checked in`,
 												html: textToSend
 											}
 
